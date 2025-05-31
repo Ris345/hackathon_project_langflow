@@ -1,8 +1,10 @@
 import os
 import requests
-from flask import Flask, request
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from dotenv import load_dotenv
+import os
+from langchain_google_community import GoogleSearchAPIWrapper
+from flask import Flask, jsonify, request
 
 # Load environment variables from .env file
 load_dotenv()
@@ -108,6 +110,66 @@ def voice():
         response.hangup()
 
     return str(response)
+
+
+@app.route('/search')
+def test_your_search():
+    """Test Google Search API and return results to browser"""
+    
+    try:
+        # Initialize search
+        search = GoogleSearchAPIWrapper(
+            google_api_key=os.getenv('GOOGLE_API_KEY'),
+            google_cse_id=os.getenv('GOOGLE_CSE_ID'), # Your CSE ID
+            k=3
+        )
+        print(search)
+        # Perform search
+        results = search.results("software engineer jobs", num_results=3)
+        print("✅ Search successful!")  # This prints to console
+        print(f"Found {len(results)} results")
+        
+        # Prepare response for browser
+        response_data = {
+            "status": "success",
+            "message": f"Found {len(results)} results",
+            "results_count": len(results),
+            "results": []
+        }
+        
+        # Process results for JSON response
+        for i, result in enumerate(results, 1):
+            title = result.get('title', 'No title')
+            link = result.get('link', 'No link')
+            snippet = result.get('snippet', 'No snippet')
+            
+            print(f"- {title}")  # Console output
+            print(f"  {link}")
+            print()
+            
+            # Add to response
+            response_data["results"].append({
+                "index": i,
+                "title": title,
+                "link": link,
+                "snippet": snippet
+            })
+        
+        # Return JSON response to browser
+        return jsonify(response_data)
+        
+    except Exception as e:
+        error_message = f"❌ Error: {e}"
+        print(error_message)  # Console output
+        
+        # Return error response to browser
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "results_count": 0,
+            "results": []
+        }), 500
+
 
 # --- Main execution block ---
 if __name__ == "__main__":
