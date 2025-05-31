@@ -114,40 +114,43 @@ def voice():
 
 @app.route('/search')
 def test_your_search():
-    """Test Google Search API and return results to browser"""
+    """Search only for S3 bucket interview questions"""
     
     try:
         # Initialize search
         search = GoogleSearchAPIWrapper(
             google_api_key=os.getenv('GOOGLE_API_KEY'),
-            google_cse_id=os.getenv('GOOGLE_CSE_ID'), # Your CSE ID
+            google_cse_id=os.getenv('GOOGLE_CSE_ID'),
             k=3
         )
-        print(search)
-        # Perform search
-        results = search.results("software engineer jobs", num_results=3)
-        print("✅ Search successful!")  # This prints to console
-        print(f"Found {len(results)} results")
         
-        # Prepare response for browser
+        print("🪣 Searching for S3 bucket interview questions...")
+        
+        # Simple, focused search query
+        search_query = "S3 bucket interview questions AWS"
+        
+        # Perform search
+        results = search.results(search_query, num_results=3)
+        print(f"✅ Found {len(results)} S3 bucket results")
+        
+        # Prepare response
         response_data = {
             "status": "success",
-            "message": f"Found {len(results)} results",
+            "message": f"Found {len(results)} S3 bucket interview questions",
             "results_count": len(results),
             "results": []
         }
         
-        # Process results for JSON response
+        # Process results
         for i, result in enumerate(results, 1):
             title = result.get('title', 'No title')
             link = result.get('link', 'No link')
             snippet = result.get('snippet', 'No snippet')
             
-            print(f"- {title}")  # Console output
-            print(f"  {link}")
+            print(f"{i}. {title}")
+            print(f"   {link}")
             print()
             
-            # Add to response
             response_data["results"].append({
                 "index": i,
                 "title": title,
@@ -155,21 +158,17 @@ def test_your_search():
                 "snippet": snippet
             })
         
-        # Return JSON response to browser
         return jsonify(response_data)
         
     except Exception as e:
-        error_message = f"❌ Error: {e}"
-        print(error_message)  # Console output
+        print(f"❌ Error: {e}")
         
-        # Return error response to browser
         return jsonify({
             "status": "error",
             "message": str(e),
             "results_count": 0,
             "results": []
         }), 500
-
 
 # --- Main execution block ---
 if __name__ == "__main__":
