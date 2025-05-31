@@ -18,10 +18,12 @@ TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
 
 # Your Langflow API URL (e.g., http://localhost:7860/api/v1/run)
 # Replace with your actual Langflow flow's API endpoint
-LANGFLOW_API_URL = os.getenv('LANGFLOW_API_URL')
+LANGFLOW_API_URL = "http://127.0.0.1:7860/api/v1/run/753e288d-4880-415f-a42e-13961826bb8b" #os.getenv('LANGFLOW_API_URL')##
 # Your Langflow API Key (if your flow requires authentication)
 LANGFLOW_API_KEY = os.getenv('LANGFLOW_API_KEY')
 
+# --- Helper Function to Call Langflow API ---
+# --- Helper Function to Call Langflow API ---
 # --- Helper Function to Call Langflow API ---
 def call_langflow_api(user_input):
     """
@@ -34,15 +36,15 @@ def call_langflow_api(user_input):
     headers = {
         "Content-Type": "application/json",
     }
-    if LANGFLOW_API_KEY:
-        headers["X-API-Key"] = LANGFLOW_API_KEY # Or "Authorization": f"Bearer {LANGFLOW_API_KEY}" depending on Langflow setup
+    # Note: Remove API key header since your expected request doesn't use it
+    # if LANGFLOW_API_KEY:
+    #     headers["X-API-Key"] = LANGFLOW_API_KEY
 
+    # Fixed payload structure to match expected format
     payload = {
-        "input": {
-            "question": user_input # Adjust 'question' key based on your Langflow flow's input component name
-        },
-        "output_type": "chat", # Or "text" or "json" depending on your Langflow flow's output
-        "stream": False
+        "input_value": user_input,  # Changed from nested "input" object
+        "output_type": "chat",      # Keep as specified
+        "input_type": "chat"        # Added missing input_type
     }
 
     try:
@@ -52,23 +54,41 @@ def call_langflow_api(user_input):
         langflow_response = response.json()
         print(f"Received from Langflow: {langflow_response}")
 
-        # Extract the actual response text. This might vary based on your Langflow flow's output.
-        # Common structures are 'result', 'text', or 'outputs'
-        # Let's assume a common structure like {'outputs': [{'results': {'text': '...'}}]} or similar
-        # You might need to inspect the actual JSON response from your Langflow flow.
-        if 'outputs' in langflow_response and langflow_response['outputs']:
-            # Assuming the first output contains the main text response
-            for output in langflow_response['outputs']:
-                if 'results' in output and 'text' in output['results']:
-                    return output['results']['text']
-                elif 'text' in output: # Fallback for simpler text output
-                    return output['text']
-        elif 'result' in langflow_response: # Another common structure
-            return langflow_response['result']
-        elif 'response' in langflow_response: # Yet another common structure
-            return langflow_response['response']
-
-        return "I received a response from the AI, but I couldn't understand its format."
+        # Extract the actual response text from the Langflow response structure
+        try:
+            # Navigate through the nested JSON structure
+            outputs = langflow_response.get('outputs', [])
+            if outputs and len(outputs) > 0:
+                first_output = outputs[0]
+                results = first_output.get('outputs', [])
+                if results and len(results) > 0:
+                    result = results[0]
+                    # The actual text is nested deep in the structure
+                    message_data = result.get('results', {}).get('message', {})
+                    if isinstance(message_data, dict):
+                        # Try multiple possible paths to the text
+                        text = (message_data.get('data', {}).get('text') or 
+                               message_data.get('text') or
+                               result.get('artifacts', {}).get('message') or
+                               result.get('outputs', {}).get('message', {}).get('message'))
+                        
+                        if text:
+                            return text
+            
+            # Fallback: look for any 'message' field in the response
+            if 'message' in str(langflow_response):
+                # Try to extract from messages array
+                outputs = langflow_response.get('outputs', [])
+                if outputs:
+                    messages = outputs[0].get('outputs', [{}])[0].get('messages', [])
+                    if messages:
+                        return messages[0].get('message', '')
+            
+            return "I received a response from the AI, but couldn't extract the message."
+            
+        except (KeyError, IndexError, TypeError) as parse_error:
+            print(f"Error parsing response structure: {parse_error}")
+            return "I received a response from the AI, but couldn't parse it properly."
 
     except requests.exceptions.RequestException as e:
         print(f"Error calling Langflow API: {e}")
@@ -76,7 +96,6 @@ def call_langflow_api(user_input):
     except ValueError as e:
         print(f"Error parsing Langflow response: {e}")
         return "I'm sorry, I received an invalid response from the AI service."
-
 
 # --- Twilio Voice Webhook ---
 @app.route("/voice", methods=['GET', 'POST'])
